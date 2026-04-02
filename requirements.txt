@@ -6,3 +6,5 @@ python-dotenv==1.2.2
 requests
 uvicorn==0.42.0
 yt-dlp==2026.3.17
+slowapi==0.1.9
+supabase==2.28.3
