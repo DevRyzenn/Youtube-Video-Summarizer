@@ -1,5 +1,6 @@
 import yt_dlp
 import os
+import shutil
 
 SAVE_PATH = "audio/"
 
@@ -13,7 +14,17 @@ def download_audio(youtube_url: str) -> str:
     returns the file path as a string
     """
     ensure_dir_exists(SAVE_PATH)
-    ffmpeg_dir = os.path.expanduser("~/.local/bin")
+
+    # Discover ffmpeg portably: honour env var, then search PATH.
+    # Only set ffmpeg_location when we can confirm the binaries exist.
+    ffmpeg_location = os.environ.get("FFMPEG_LOCATION")
+    if ffmpeg_location and not os.path.isdir(ffmpeg_location):
+        ffmpeg_location = None
+    if ffmpeg_location is None:
+        ffmpeg_bin = shutil.which("ffmpeg")
+        if ffmpeg_bin:
+            ffmpeg_location = os.path.dirname(ffmpeg_bin)
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': SAVE_PATH + '%(title)s.%(ext)s',
@@ -23,8 +34,9 @@ def download_audio(youtube_url: str) -> str:
             'preferredquality': '0',
         }],
         'restrictfilenames': True,
-        'ffmpeg_location': ffmpeg_dir,
     }
+    if ffmpeg_location:
+        ydl_opts['ffmpeg_location'] = ffmpeg_location
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)

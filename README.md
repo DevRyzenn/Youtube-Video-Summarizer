@@ -39,7 +39,7 @@ A self-hosted web app that downloads audio from any public YouTube video, transc
 ## Prerequisites
 
 - Python 3.10+
-- `ffmpeg` and `ffprobe` on your system PATH (or at `~/.local/bin`)
+- `ffmpeg` and `ffprobe` on your system PATH (auto-discovered; see [Install ffmpeg](#2-install-ffmpeg) section)
 - A [Groq API key](https://console.groq.com/)
 - A [Supabase](https://supabase.com/) project with a `summaries` table (optional — app works without it)
 
@@ -56,16 +56,35 @@ cd yt-video-summarizer
 
 ### 2. Install ffmpeg
 
+The app auto-discovers `ffmpeg` and `ffprobe` from your system PATH. Choose any method below that works for your OS:
+
 ```bash
-# macOS (via Homebrew)
+# Linux (Debian/Ubuntu)
+sudo apt-get install ffmpeg
+
+# Linux (Fedora/RHEL)
+sudo dnf install ffmpeg
+
+# macOS (Homebrew — recommended)
 brew install ffmpeg
 
-# or install the standalone binary
-curl -L https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip -o /tmp/ffmpeg.zip
-unzip /tmp/ffmpeg.zip -d ~/.local/bin && chmod +x ~/.local/bin/ffmpeg
+# macOS (MacPorts)
+sudo port install ffmpeg
 
-curl -L https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip -o /tmp/ffprobe.zip
-unzip /tmp/ffprobe.zip -d ~/.local/bin && chmod +x ~/.local/bin/ffprobe
+# Windows (Chocolatey)
+choco install ffmpeg
+
+# Windows (Scoop)
+scoop install ffmpeg
+
+# Docker
+# FFmpeg is pre-installed; no action needed.
+```
+
+**Optional:** Override ffmpeg location via environment variable (useful in Docker or CI):
+```bash
+export FFMPEG_LOCATION=/custom/path/to/ffmpeg/bin
+python -m uvicorn app.main:app
 ```
 
 ### 3. Create a virtual environment
@@ -98,6 +117,9 @@ Supabase is optional — if the table doesn't exist the app will still summarise
 
 ```bash
 uvicorn app.main:app --reload
+```
+
+The app will auto-detect `ffmpeg` from your system PATH. No manual configuration needed.
 ```
 
 Open [http://localhost:8000](http://localhost:8000)
