@@ -13,6 +13,7 @@ def download_audio(youtube_url: str) -> str:
     returns the file path as a string
     """
     ensure_dir_exists(SAVE_PATH)
+    ffmpeg_dir = os.path.expanduser("~/.local/bin")
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': SAVE_PATH + '%(title)s.%(ext)s',
@@ -22,6 +23,7 @@ def download_audio(youtube_url: str) -> str:
             'preferredquality': '0',
         }],
         'restrictfilenames': True,
+        'ffmpeg_location': ffmpeg_dir,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
