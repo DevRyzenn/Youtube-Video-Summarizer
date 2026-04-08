@@ -1,9 +1,10 @@
+aiofiles==24.1.0
 fastapi==0.135.2
 groq==1.1.2
 openai-whisper==20250625
 pydantic==2.12.5
 python-dotenv==1.2.2
-requests
+requests==2.33.1
 uvicorn==0.42.0
 yt-dlp==2026.3.17
 slowapi==0.1.9
