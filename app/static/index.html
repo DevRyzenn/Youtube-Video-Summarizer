@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distill — AI Video Summarizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet" />
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:           #0A0908;
+            --surface:      #121110;
+            --surface-2:    #1C1917;
+            --border:       #242120;
+            --border-light: #2E2A26;
+            --text:         #EDE8DF;
+            --text-muted:   #7A7068;
+            --text-dim:     #3A3530;
+            --accent:       #C4890A;
+            --accent-hover: #DC9C0E;
+            --accent-dim:   rgba(196, 137, 10, 0.10);
+            --success:      #4E9468;
+            --error:        #B04035;
+            --radius:       6px;
+            --mono:         'JetBrains Mono', 'Fira Code', monospace;
+            --sans:         'Space Grotesk', system-ui, -apple-system, sans-serif;
+        }
+
+        html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+
+
+        /* ─── Main ─── */
+        main {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 100px 24px 100px;
+        }
+
+        /* ─── Hero ─── */
+        .hero {
+            width: 100%; max-width: 760px;
+            text-align: center;
+        }
+
+        .tagline {
+            display: inline-flex; align-items: center; gap: 10px;
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 16px;
+        }
+        .tagline::before, .tagline::after {
+            content: '';
+            display: block; width: 28px; height: 1px;
+            background: var(--accent); opacity: 0.35;
+        }
+
+        .app-name {
+            font-family: 'Clash Display', var(--sans);
+            font-size: clamp(32px, 5vw, 52px);
+            font-weight: 600; line-height: 1;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            white-space: nowrap;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 17px; line-height: 1.75;
+            color: var(--text-muted); font-weight: 400;
+            margin-bottom: 48px;
+            max-width: 520px;
+            margin-left: auto; margin-right: auto;
+        }
+
+        /* ─── Input ─── */
+        .input-row {
+            display: flex;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            background: var(--surface);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-row:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        #yt-url {
+            flex: 1; min-width: 0;
+            background: transparent; border: none; outline: none;
+            padding: 15px 18px;
+            font-size: 15px; font-family: var(--sans);
+            color: var(--text);
+        }
+        #yt-url::placeholder { color: var(--text-dim); }
+
+        #submit-btn {
+            flex-shrink: 0;
+            background: var(--accent); color: #0A0908;
+            border: none; outline: none;
+            padding: 14px 24px;
+            font-size: 14px; font-weight: 600; font-family: var(--sans);
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            border-radius: 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        #submit-btn:hover:not(:disabled) { background: var(--accent-hover); }
+        #submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ─── Error ─── */
+        .error-banner {
+            width: 100%; max-width: 580px;
+            margin-top: 14px;
+            padding: 11px 16px;
+            background: rgba(176, 64, 53, 0.08);
+            border: 1px solid rgba(176, 64, 53, 0.28);
+            border-radius: var(--radius);
+            font-size: 14px; color: #C86050;
+            display: none; text-align: left;
+        }
+        .error-banner.show { display: block; }
+
+        /* ─── Pipeline ─── */
+        .pipeline {
+            width: 100%; max-width: 580px;
+            margin-top: 52px;
+            display: none;
+        }
+        .pipeline.show { display: block; }
+
+        .pipeline-label {
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .steps { display: flex; flex-direction: column; gap: 8px; }
+
+        .step {
+            display: flex; align-items: center; gap: 14px;
+            padding: 13px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            transition: border-color 0.35s, background 0.35s, opacity 0.35s;
+        }
+
+        .step.active {
+            border-color: rgba(196, 137, 10, 0.45);
+            background-color: var(--accent-dim);
+            background-image: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(196, 137, 10, 0.07) 50%,
+                transparent 100%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 2.4s ease-in-out infinite;
+        }
+
+        .step.done { opacity: 1; border-color: rgba(78, 148, 104, 0.3); background: rgba(78, 148, 104, 0.04); }
+        .step.done .step-title { color: #6BBF8A; }
+
+        @keyframes shimmer {
+            0%   { background-position: 120% 0; }
+            100% { background-position: -120% 0; }
+        }
+
+        .step-num {
+            width: 26px; height: 26px; flex-shrink: 0;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--mono); font-size: 10px; font-weight: 500;
+            background: var(--surface-2); color: var(--text-dim);
+            border: 1px solid var(--border);
+            transition: all 0.35s;
+        }
+        .step.active .step-num {
+            background: var(--accent); color: var(--bg);
+            border-color: var(--accent);
+        }
+        .step.done .step-num {
+            background: transparent;
+            color: #6BBF8A; border-color: #6BBF8A;
+        }
+
+        .step-title {
+            font-size: 15px; color: var(--text-muted);
+            transition: color 0.35s;
+            flex: 1;
+        }
+        .step.active .step-title { color: var(--text); }
+
+        .step-timer {
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.06em;
+            color: var(--text-dim);
+            flex-shrink: 0;
+            transition: color 0.35s;
+            min-width: 36px; text-align: right;
+        }
+        .step.active .step-timer { color: var(--accent); }
+        .step.done .step-timer { color: #6BBF8A; }
+
+        /* ─── Video info bar ─── */
+        .video-info-bar {
+            display: flex; align-items: center; gap: 32px;
+            padding: 14px 18px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .video-info-field {
+            display: flex; align-items: baseline; gap: 10px;
+            min-width: 0;
+        }
+
+        .video-info-label {
+            font-family: var(--mono);
+            font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .video-info-value {
+            font-size: 14px; font-weight: 500;
+            color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .video-info-divider {
+            width: 1px; height: 18px; flex-shrink: 0;
+            background: var(--border-light);
+        }
+
+        /* ─── Results ─── */
+        .results-wrap {
+            width: 100%; max-width: 1060px;
+            margin-top: 60px;
+            display: none; flex-direction: column; gap: 16px;
+        }
+        .results-wrap.show { display: flex; }
+
+        .meta-bar {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .meta-dot {
+            width: 7px; height: 7px; flex-shrink: 0;
+            background: var(--success); border-radius: 50%;
+        }
+        .meta-url {
+            font-family: var(--mono); font-size: 12px;
+            color: var(--text-muted);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            flex: 1;
+        }
+
+        .btn-ghost {
+            flex-shrink: 0;
+            background: transparent;
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 5px 14px;
+            font-size: 13px; font-family: var(--sans); letter-spacing: 0.04em;
+            border-radius: 4px; cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-ghost.copied { border-color: var(--success); color: var(--success); }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 16px;
+        }
+        @media (max-width: 800px) { .results-grid { grid-template-columns: 1fr; } }
+
+        /* ─── Cards ─── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+            transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--border-light); }
+
+        .card-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .card-label {
+            display: flex; align-items: center; gap: 8px;
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+            color: #A09880;
+        }
+        .label-pip {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--accent);
+        }
+        .label-pip.dim { background: var(--text-dim); }
+
+        .card-right {
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .card-stat {
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.06em; color: #635B52;
+        }
+
+        .summary-body {
+            padding: 24px 24px 28px;
+            overflow-y: auto;
+        }
+        .summary-body p {
+            font-size: 16px; line-height: 1.9;
+            color: var(--text); font-weight: 400;
+            margin-bottom: 18px;
+        }
+        .summary-body p:last-child { margin-bottom: 0; }
+        .summary-body strong { font-weight: 600; color: var(--text); }
+        .summary-body em { font-style: italic; }
+        .summary-body ul, .summary-body ol {
+            padding-left: 20px; margin-bottom: 18px;
+        }
+        .summary-body li {
+            font-size: 16px; line-height: 1.9;
+            color: var(--text); margin-bottom: 4px;
+        }
+        .summary-body h1, .summary-body h2, .summary-body h3 {
+            font-family: 'Clash Display', var(--sans);
+            color: var(--text); font-weight: 600;
+            margin-bottom: 10px; margin-top: 6px;
+            line-height: 1.3;
+        }
+        .summary-body h1 { font-size: 20px; }
+        .summary-body h2 { font-size: 18px; }
+        .summary-body h3 { font-size: 16px; }
+        .summary-body code {
+            font-family: var(--mono); font-size: 13px;
+            background: var(--surface-2); padding: 1px 5px;
+            border-radius: 3px; color: var(--accent);
+        }
+
+        .transcript-body {
+            padding: 18px;
+            flex: 1; max-height: 520px; overflow-y: auto;
+            font-family: var(--mono); font-size: 13px; line-height: 1.9;
+            color: var(--text-muted);
+            white-space: pre-wrap; word-break: break-word;
+            scrollbar-width: thin; scrollbar-color: var(--border-light) transparent;
+        }
+        .transcript-body::-webkit-scrollbar { width: 3px; }
+        .transcript-body::-webkit-scrollbar-track { background: transparent; }
+        .transcript-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+        /* ─── Feature strip ─── */
+        .features {
+            width: 100%; max-width: 780px;
+            margin-top: 80px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--border);
+        }
+        @media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+
+        .feat {
+            background: var(--surface);
+            padding: 28px 26px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .feat-num {
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.14em; color: var(--accent);
+        }
+
+        .feat-title {
+            font-size: 16px; font-weight: 600;
+            color: var(--text); line-height: 1.3;
+        }
+
+        .feat-desc {
+            font-size: 14px; line-height: 1.75;
+            color: var(--text-muted);
+        }
+
+        /* ─── Footer ─── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 14px 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .footer-text {
+            font-family: var(--mono);
+            font-size: 11px; letter-spacing: 0.08em; color: #635B52;
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 600px) {
+            main { padding: 64px 16px 80px; }
+            footer { padding: 14px 20px; }
+            #submit-btn { padding: 14px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Main -->
+<main>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="tagline">Extract the signal from any video</div>
+        <h1 class="app-name">YouTube Video Summarizer</h1>
+        <p class="subtitle">
+            Drop a YouTube link. Get a clean summary and full transcript — no sign-up, no fluff, just the takeaways.
+        </p>
+
+        <div class="input-row">
+            <input
+                id="yt-url"
+                type="text"
+                placeholder="https://youtube.com/watch?v=..."
+                autocomplete="off"
+                spellcheck="false"
+            />
+            <button id="submit-btn" onclick="handleSubmit()">Summarize &rarr;</button>
+        </div>
+    </section>
+
+    <!-- Error -->
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- Feature strip (hidden when pipeline/results are shown) -->
+    <div id="landing-content">
+
+        <div class="features">
+            <div class="feat">
+                <span class="feat-num">01 &mdash; Download</span>
+                <div class="feat-title">Any public YouTube video</div>
+                <p class="feat-desc">Paste any URL — lectures, podcasts, interviews, tutorials. yt-dlp extracts the audio stream directly, no browser needed.</p>
+            </div>
+            <div class="feat">
+                <span class="feat-num">02 &mdash; Transcribe</span>
+                <div class="feat-title">Word-accurate speech-to-text</div>
+                <p class="feat-desc">OpenAI Whisper runs locally against the audio track, producing a clean verbatim transcript regardless of accent or background noise.</p>
+            </div>
+            <div class="feat">
+                <span class="feat-num">03 &mdash; Summarise</span>
+                <div class="feat-title">Dense, readable summary</div>
+                <p class="feat-desc">The transcript is sent to a Groq-hosted LLM. You get back a tight, structured summary you can skim in 30 seconds.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Pipeline -->
+    <div class="pipeline" id="pipeline">
+        <div class="pipeline-label">Processing pipeline</div>
+        <div class="steps">
+            <div class="step" id="step-1">
+                <div class="step-num">01</div>
+                <div class="step-title">Downloading audio stream via yt-dlp</div>
+                <div class="step-timer" id="timer-1">—</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-num">02</div>
+                <div class="step-title">Transcribing speech with OpenAI Whisper</div>
+                <div class="step-timer" id="timer-2">—</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-num">03</div>
+                <div class="step-title">Generating summary via Groq LLM</div>
+                <div class="step-timer" id="timer-3">—</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="results-wrap">
+
+        <div class="meta-bar">
+            <div class="meta-dot"></div>
+            <span class="meta-url" id="meta-url"></span>
+            <button class="btn-ghost" id="btn-view-video" onclick="viewVideo()">View video &nearr;</button>
+            <button class="btn-ghost" onclick="handleReset()">New video</button>
+        </div>
+
+        <div class="video-info-bar" id="video-info-bar" style="display:none">
+            <div class="video-info-field" style="flex:1;min-width:0">
+                <span class="video-info-label">Title</span>
+                <span class="video-info-value" id="video-title"></span>
+            </div>
+            <div class="video-info-divider"></div>
+            <div class="video-info-field" style="flex-shrink:0">
+                <span class="video-info-label">Author</span>
+                <span class="video-info-value" id="channel-name"></span>
+            </div>
+        </div>
+
+        <div class="results-grid">
+
+            <!-- Summary card -->
+            <div class="card">
+                <div class="card-head">
+                    <div class="card-label">
+                        <div class="label-pip"></div>
+                        Summary
+                    </div>
+                    <div class="card-right">
+                        <span class="card-stat" id="summary-wc"></span>
+                        <button class="btn-ghost" id="btn-copy-summary" onclick="copyCard('summary-body', 'btn-copy-summary', true)">Copy</button>
+                    </div>
+                </div>
+                <div class="summary-body" id="summary-body"></div>
+            </div>
+
+            <!-- Transcript card -->
+            <div class="card">
+                <div class="card-head">
+                    <div class="card-label">
+                        <div class="label-pip dim"></div>
+                        Transcript
+                    </div>
+                    <div class="card-right">
+                        <span class="card-stat" id="transcript-wc"></span>
+                        <button class="btn-ghost" id="btn-copy-transcript" onclick="copyCard('transcript-body', 'btn-copy-transcript', false)">Copy</button>
+                    </div>
+                </div>
+                <div class="transcript-body" id="transcript-body"></div>
+            </div>
+
+        </div>
+    </div>
+
+</main>
+
+<!-- Footer -->
+<footer>
+    <p class="footer-text">Rate limited &middot; 3 requests / min per IP &nbsp;&bull;&nbsp; Powered by Whisper + Groq</p>
+</footer>
+
+<script>
+    let pollInterval  = null;
+    let pollCount     = 0;
+    let stepTimers    = { 1: null, 2: null, 3: null };
+    let stepSeconds   = { 1: 0,    2: 0,    3: 0 };
+    let currentStep   = 0;
+    let videoInfo     = null;
+
+    const $ = id => document.getElementById(id);
+
+    /* ── Utilities ── */
+    function showError(msg) {
+        const el = $('error-banner');
+        el.textContent = msg;
+        el.classList.add('show');
+    }
+
+    function hideError() {
+        $('error-banner').classList.remove('show');
+    }
+
+    function startStepTimer(n) {
+        if (stepTimers[n]) return; // already running
+        stepTimers[n] = setInterval(() => {
+            stepSeconds[n]++;
+            $(`timer-${n}`).textContent = stepSeconds[n] + 's';
+        }, 1000);
+    }
+
+    function stopStepTimer(n) {
+        if (stepTimers[n]) { clearInterval(stepTimers[n]); stepTimers[n] = null; }
+    }
+
+    function setStep(n) {
+        // n = 1|2|3: that step is active, prior steps are done
+        // n = 0: all done (mark all done)
+        for (let i = 1; i <= 3; i++) {
+            const el = $(`step-${i}`);
+            el.classList.remove('active', 'done');
+            if (n === 0 || i < n) {
+                el.classList.add('done');
+                stopStepTimer(i);
+            } else if (i === n) {
+                el.classList.add('active');
+                startStepTimer(i);
+            }
+        }
+        currentStep = n;
+    }
+
+    function resetBtn() {
+        const btn = $('submit-btn');
+        btn.disabled = false;
+        btn.textContent = 'Summarize \u2192';
+    }
+
+    function wordCount(text) {
+        return text.trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    /* ── Submit ── */
+    async function handleSubmit() {
+        const url = $('yt-url').value.trim();
+        hideError();
+
+        if (!url) {
+            showError('Please enter a YouTube URL.');
+            return;
+        }
+        if (!/youtube\.com\/|youtu\.be\//.test(url)) {
+            showError("That doesn\u2019t look like a valid YouTube URL.");
+            return;
+        }
+
+        const btn = $('submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Working\u2026';
+
+        $('results-wrap').classList.remove('show');
+        $('pipeline').classList.add('show');
+        $('landing-content').style.display = 'none';
+        // reset timers for a fresh run
+        for (let i = 1; i <= 3; i++) {
+            stopStepTimer(i);
+            stepSeconds[i] = 0;
+            $(`timer-${i}`).textContent = '—';
+        }
+        pollCount = 0;
+        setStep(1);
+
+        try {
+            const res = await fetch('/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ yt_url: url })
+            });
+
+            if (!res.ok) {
+                let detail = `Server error (${res.status})`;
+                try { detail = (await res.json()).detail || detail; } catch {}
+                throw new Error(detail);
+            }
+
+            const { job_id } = await res.json();
+
+            // Fetch video metadata in parallel (non-blocking)
+            fetch('/video-info?url=' + encodeURIComponent(url))
+                .then(r => r.json())
+                .then(info => { videoInfo = info; })
+                .catch(() => {});
+
+            startPolling(job_id, url);
+
+        } catch (err) {
+            $('pipeline').classList.remove('show');
+            resetBtn();
+            showError(err.message || 'Something went wrong. Please try again.');
+        }
+    }
+
+    /* ── Polling ── */
+    function startPolling(jobId, originalUrl) {
+        pollInterval = setInterval(async () => {
+            pollCount++;
+
+            try {
+                const res = await fetch(`/status/${jobId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Sync step indicator with real backend step
+                if (data.step && data.step !== currentStep) {
+                    setStep(data.step);
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    renderResults(data.result, originalUrl);
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    $('pipeline').classList.remove('show');
+                    resetBtn();
+                    showError('Processing failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch { /* network hiccup — retry on next tick */ }
+
+        }, 1500);
+    }
+
+    /* ── Minimal markdown parser ── */
+    function parseMarkdown(text) {
+        const lines = text.split('\n');
+        let html = '';
+        let inUL = false, inOL = false;
+
+        const closeList = () => {
+            if (inUL) { html += '</ul>'; inUL = false; }
+            if (inOL) { html += '</ol>'; inOL = false; }
+        };
+
+        const inlineFormat = s => s
+            .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/__(.+?)__/g, '<strong>$1</strong>')
+            .replace(/_(.+?)_/g, '<em>$1</em>')
+            .replace(/`(.+?)`/g, '<code>$1</code>');
+
+        for (let raw of lines) {
+            const line = raw.trimEnd();
+            if (/^### (.+)/.test(line))      { closeList(); html += `<h3>${inlineFormat(line.slice(4))}</h3>`; }
+            else if (/^## (.+)/.test(line))  { closeList(); html += `<h2>${inlineFormat(line.slice(3))}</h2>`; }
+            else if (/^# (.+)/.test(line))   { closeList(); html += `<h1>${inlineFormat(line.slice(2))}</h1>`; }
+            else if (/^[\-\*] (.+)/.test(line)) {
+                if (inOL) { html += '</ol>'; inOL = false; }
+                if (!inUL) { html += '<ul>'; inUL = true; }
+                html += `<li>${inlineFormat(line.slice(2))}</li>`;
+            }
+            else if (/^\d+\. (.+)/.test(line)) {
+                if (inUL) { html += '</ul>'; inUL = false; }
+                if (!inOL) { html += '<ol>'; inOL = true; }
+                html += `<li>${inlineFormat(line.replace(/^\d+\.\s/, ''))}</li>`;
+            }
+            else if (line.trim() === '') {
+                closeList();
+            }
+            else {
+                closeList();
+                html += `<p>${inlineFormat(line)}</p>`;
+            }
+        }
+        closeList();
+        return html;
+    }
+
+    /* ── Render results ── */
+    function renderResults(result, url) {
+        setStep(0);
+        $('pipeline').classList.remove('show');
+
+        // Summary — parse markdown
+        const summaryEl = $('summary-body');
+        summaryEl.innerHTML = parseMarkdown(result.summary);
+        $('summary-wc').textContent = wordCount(result.summary) + ' words';
+
+        // Transcript
+        $('transcript-body').textContent = result.transcript;
+        $('transcript-wc').textContent = wordCount(result.transcript) + ' words';
+
+        // Video info bar
+        const infoBar = $('video-info-bar');
+        if (videoInfo && (videoInfo.title || videoInfo.channel)) {
+            $('video-title').textContent = videoInfo.title || '';
+            $('channel-name').textContent = videoInfo.channel || '';
+            infoBar.style.display = '';
+        } else {
+            infoBar.style.display = 'none';
+        }
+
+        // Meta bar
+        $('meta-url').textContent = url;
+
+        // Show results
+        $('results-wrap').classList.add('show');
+        resetBtn();
+
+        setTimeout(() => {
+            $('results-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+    }
+
+    /* ── Reset ── */
+    function handleReset() {
+        if (pollInterval) clearInterval(pollInterval);
+        for (let i = 1; i <= 3; i++) {
+            stopStepTimer(i);
+            stepSeconds[i] = 0;
+            $(`timer-${i}`).textContent = '—';
+        }        $('video-info-bar').style.display = 'none';
+        videoInfo = null;        $('yt-url').value = '';
+        $('results-wrap').classList.remove('show');
+        $('pipeline').classList.remove('show');
+        $('landing-content').style.display = '';
+        hideError();
+        resetBtn();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => $('yt-url').focus(), 380);
+    }
+
+    /* ── View video ── */
+    function viewVideo() {
+        const url = $('meta-url').textContent;
+        if (url) window.open(url, '_blank', 'noopener');
+    }
+
+    /* ── Copy ── */
+    function copyCard(bodyId, btnId, isParagraphs) {
+        const el  = $(bodyId);
+        const text = isParagraphs
+            ? Array.from(el.querySelectorAll('p')).map(p => p.textContent).join('\n\n')
+            : el.textContent;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = $(btnId);
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+                btn.classList.remove('copied');
+            }, 2000);
+        }).catch(() => {});
+    }
+
+    /* ── Enter key ── */
+    $('yt-url').addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleSubmit();
+    });
+</script>
+
+</body>
+</html>
